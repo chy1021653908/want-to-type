@@ -36,5 +36,5 @@
   "scripts": {
     "test": "node --test tests/*.test.cjs"
   },
-  "description": "Theme-matched typing effects, companions, combos and sounds for DSH."
+  "description": "Typing effects, companions and sounds for DSH."
 }
