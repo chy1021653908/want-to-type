@@ -15,7 +15,13 @@
 
 ## 使用
 
-将此目录作为本地插件加载到 DSH，插件标识为 `@local/want-to-type`，入口配置见 `package.json` 与 `cordis.patch.yml`。刷新 DSH 后，可从输入框旁的键盘图标选择主题并设置特效。
+从 npm 安装到 DSH 的当前 profile：
+
+```
+plugin_manager  action: install_bundle  target: "@moonkingdom/want-to-type@1.3.0"
+```
+
+也可以把此目录作为本地插件加载（`plugin_manager` 的 `install_bundle`，target 传绝对路径）。入口配置见 `package.json` 与 `cordis.patch.yml`。刷新 DSH 后，可从输入框旁的键盘图标选择主题并设置特效。
 
 此项目依赖 DSH 提供的 ModuleLoader、React 和 UI slots，不能作为独立网页直接运行。运行资源均随 `client.js` 内嵌，无需构建，也不依赖运行时外部资源下载。
 
@@ -56,4 +62,8 @@ npm test
 
 素材来源、修改说明与版权许可见 `THIRD_PARTY_NOTICES.md` 和 `LICENSE-*.txt`。原作者的署名与许可随项目保留。
 
-`package.json` 中的 `private: true` 用于防止误发到 npm；GitHub 仓库的私有可见性由仓库设置单独控制。
+## 发布
+
+已发布到 npm：`@moonkingdom/want-to-type`。版本号遵循 SemVer，`engines.dsh` 限制最低 DSH 版本；发布前执行 `npm pack --dry-run` 核对文件清单，再用 `npm publish` 上传。
+
+GitHub 仓库的可见性由仓库设置单独控制。
