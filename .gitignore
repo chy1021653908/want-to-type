@@ -1,0 +1,12 @@
+# Local files
+.DS_Store
+node_modules/
+.npm/
+coverage/
+*.log
+*.tgz
+
+# Credentials and local environment
+.env
+.env.*
+!.env.example
