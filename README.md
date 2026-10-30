@@ -15,7 +15,7 @@
 
 ## 使用
 
-将此目录作为本地插件加载到 DSH，插件标识为 `@local/want-to-type`，入口配置见 `package.json` 与 `cordis.patch.yml`。刷新 DSH 后，可从输入框旁的键盘图标或插件设置页选择主题。
+将此目录作为本地插件加载到 DSH，插件标识为 `@local/want-to-type`，入口配置见 `package.json` 与 `cordis.patch.yml`。刷新 DSH 后，可从输入框旁的键盘图标选择主题并设置特效。
 
 此项目依赖 DSH 提供的 ModuleLoader、React 和 UI slots，不能作为独立网页直接运行。运行资源均随 `client.js` 内嵌，无需构建，也不依赖运行时外部资源下载。
 

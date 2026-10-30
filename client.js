@@ -2201,12 +2201,6 @@ window.__ModuleLoader__.load({
           language));
     }
 
-    /* ---------- settings tab ---------- */
-
-    function SettingsPanel() {
-      return h('div', { className: 'wtt-settings' }, h(ConfigControls, null));
-    }
-
     let ReactDOM = null;
     try {
       ReactDOM = require('react-dom');
@@ -2320,9 +2314,6 @@ window.__ModuleLoader__.load({
       apply(ctx) {
         ctx.slots.inject('shell.overlay', () =>
           ctx.slots.register({ name: 'shell.overlay', id: 'want-to-type', order: 62 }, WantToType),
-        );
-        ctx.slots.inject('settings.plugins.tab', () =>
-          ctx.slots.register({ name: 'settings.plugins.tab', id: 'want-to-type', order: 30, label: () => texts().tab }, SettingsPanel),
         );
         ctx.slots.inject('conversation.input.left', () =>
           ctx.slots.register({ name: 'conversation.input.left', id: 'want-to-type', order: 20, label: () => texts().tab }, ComposerButton),
