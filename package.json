@@ -1,6 +1,6 @@
 {
-  "name": "@moonkingdom/want-to-type",
-  "version": "1.4.1",
+  "name": "dsh-plugin-type",
+  "version": "1.4.2",
   "description": "Typing effects, companions and sounds for DSH.",
   "icon": "icon.png",
   "keywords": [

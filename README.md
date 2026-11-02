@@ -1,4 +1,4 @@
-# want-to-type
+# dsh-plugin-type
 
 为 DSH 打字过程添加主题特效、萌宠陪伴、连击动画和打字音效。支持中文输入法、浅色与深色界面，以及中英文切换。
 
@@ -16,10 +16,18 @@
 
 ## 使用
 
-从 npm 安装到 DSH 的当前 profile：
+在 DSH「插件 → 添加插件」中输入完整 npm 包名：
 
 ```
-plugin_manager  action: install_bundle  target: "@moonkingdom/want-to-type@1.4.0"
+dsh-plugin-type
+```
+
+此输入框按包名或地址解析，不是模糊搜索。包名为 `dsh-plugin-type`，直接输入该名称安装。镜像若尚未同步新版本，可切换 npm 官方源重试。
+
+也可让 DSH 的插件管理工具安装到当前 profile：
+
+```
+plugin_manager  action: install_bundle  target: "dsh-plugin-type"
 ```
 
 也可以把此目录作为本地插件加载（`plugin_manager` 的 `install_bundle`，target 传绝对路径）。入口配置见 `package.json` 与 `cordis.patch.yml`。刷新 DSH 后，可从输入框旁的键盘图标选择主题并设置特效。
@@ -27,6 +35,14 @@ plugin_manager  action: install_bundle  target: "@moonkingdom/want-to-type@1.4.0
 此项目依赖 DSH 提供的 ModuleLoader、React 和 UI slots，不能作为独立网页直接运行。运行资源均随 `client.js` 内嵌，无需构建，也不依赖运行时外部资源下载。
 
 首次使用默认大肥鱼，语言自动跟随系统；手动选择中文或 EN 后保存。配置仅保存在当前浏览器的 `dsh.want-to-type.config.v1`。
+
+### 更新后无法启动
+
+若日志出现 `@moonkingdom/want-to-type: import failed` 和 `duplicate factory registration for "@local/want-to-type"`，说明旧客户端仍使用开发期模块名。当前版本的 `client.js` 注册 ID、`package.json` 的 `name` 和 `cordis.patch.yml` 的模块名统一为 `dsh-plugin-type`。
+
+从旧包迁移时，先卸载 `@moonkingdom/want-to-type`（本地开发环境还可能有 `@local/want-to-type`），再安装 `dsh-plugin-type`，避免同时加载两份插件。完成后重启 DSH，并在插件页启用「打字特效」。存储键和界面挂载 ID 延续旧值，原有主题和音效配置可以保留。
+
+新包从 `dsh-plugin-type@1.4.1` 开始，包含模块注册修复与五个主题。旧包的安装不会自动切换到新包名，请按上述步骤迁移。
 
 ## 动效与音效规则
 
@@ -69,6 +85,6 @@ npm test
 
 ## 发布
 
-已发布到 npm：`@moonkingdom/want-to-type`。版本号遵循 SemVer，`engines.dsh` 限制最低 DSH 版本；发布前执行 `npm pack --dry-run` 核对文件清单，再用 `npm publish` 上传。
+目标 npm 包名：`dsh-plugin-type`。改名后需要以新名称发布，旧包的既有版本不会自动迁移。版本号遵循 SemVer，`engines.dsh` 限制最低 DSH 版本；发布前执行 `npm pack --dry-run` 核对文件清单，再用 `npm publish --access public` 上传。
 
 GitHub 仓库的可见性由仓库设置单独控制。
