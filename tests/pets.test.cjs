@@ -67,7 +67,7 @@ function setup(saved, audioState) {
     close() { this.state = 'closed'; return Promise.resolve(); }
   };
   let source = fs.readFileSync(path.join(__dirname, '../client.js'), 'utf8');
-  source = source.replace("    return {\n      inject: ['slots'],", "    window.__test = { PIANO_PIECES, TypingSound, PetChase, TypingPets, WantToType, physicalKeyX, petBounds, updateConfig, getConfig: () => config, PET_ATLASES, bubbleFlight, emitIn, ConfigControls, effectPalette, fullscreenLook, drawWhaleOutline, selectThemePart, sceneId };\n    return {\n      inject: ['slots'],");
+  source = source.replace("    return {\n      inject: ['slots'],", "    window.__test = { PIANO_PIECES, TypingWhaleGirl, WhaleGirlSprite, WHALE_GIRL_ART, TypingSound, PetChase, TypingPets, WantToType, physicalKeyX, petBounds, updateConfig, getConfig: () => config, PET_ATLASES, bubbleFlight, emitIn, ConfigControls, effectPalette, fullscreenLook, drawWhaleOutline, selectThemePart, sceneId };\n    return {\n      inject: ['slots'],");
   vm.runInNewContext(source, { window, document, navigator: { language: 'zh' }, performance: { now: () => now }, console, Image: class {} });
   return { ...window.__test, audioContexts, window, document, events, rafs, timers, ctx, setNow: n => { now = n; },
     advance(ms) {
@@ -80,6 +80,76 @@ function setup(saved, audioState) {
       now = until;
     } };
 }
+test('whale girl theme persists and mixes independently without changing existing defaults', () => {
+  const t = setup();
+  t.updateConfig({ theme: 'whaleGirl' });
+  assert.equal(t.getConfig().bottomPreset, 'whaleGirl');
+  assert.equal(t.getConfig().comboPreset, 'whaleGirl');
+  assert.equal(t.getConfig().typingPreset, 'hearts');
+  t.updateConfig({ soundEnabled: true, lang: 'en', fullscreenEnabled: false });
+  const restored = setup(t.getConfig()).getConfig();
+  assert.equal(restored.theme, 'whaleGirl'); assert.equal(restored.soundEnabled, true);
+  assert.equal(restored.fullscreenEnabled, false);
+  t.selectThemePart('combo', 'buddies');
+  assert.equal(t.getConfig().theme, 'custom'); assert.equal(t.getConfig().comboPreset, 'cute');
+  assert.equal(t.getConfig().bottomPreset, 'whaleGirl');
+  assert.equal(setup(t.getConfig()).getConfig().bottomPreset, 'whaleGirl');
+});
+
+test('whale girl follows keys smoothly, turns toward targets and clears on disable and timeout', () => {
+  const t = setup({ theme: 'whaleGirl' });
+  const root = t.document.createElement('div'), girl = new t.TypingWhaleGirl(root, false);
+  const editor = { closest: () => ({ isConnected: true, getBoundingClientRect: () => ({ left: 240, right: 700, bottom: 750 }) }) };
+  girl.hit(.9, editor);
+  assert.equal(girl.track.style.left, '240px'); assert.equal(girl.track.style.width, '460px');
+  assert.equal(girl.track.style.bottom, '50px'); assert.equal(girl.direction, 1);
+  const animation = girl.sprite.animation, born = girl.born;
+  t.setNow(1050); girl.tick(); const position = girl.position;
+  assert.ok(position > .5 && position < girl.target);
+  girl.hit(.9, editor); assert.equal(girl.born, born); assert.equal(girl.sprite.animation, animation);
+  girl.hit(.1, editor); assert.equal(girl.direction, -1); assert.equal(girl.origin, position);
+  t.setNow(1400); girl.tick(); assert.equal(girl.position, girl.target); assert.equal(girl.sprite.action, 'idle');
+  t.updateConfig({ bottomEnabled: false });
+  assert.equal(girl.track.style.opacity, '0'); assert.equal(animation.cancelled, true); assert.equal(girl.raf, 0);
+  t.updateConfig({ bottomEnabled: true }); girl.hit(.5, editor);
+  t.advance(3000); assert.equal(girl.track.style.opacity, '0'); assert.equal(girl.sprite.animation, null);
+  girl.destroy(); assert.equal(root.children.length, 0); assert.equal(girl.expiry, 0);
+});
+
+test('whale girl cycles expressions without restarting on every key and preview preserves live count', () => {
+  const t = setup({ theme: 'whaleGirl' }), p = new t.WantToType({}); p.componentDidMount();
+  p.combo = 2; p.paint(); assert.equal(p.girlSprite.action, 'wave');
+  const first = p.girlSprite.animation;
+  p.combo = 3; p.paint(); assert.equal(p.girlSprite.animation, first);
+  for (const action of ['shy', 'happy', 'celebrate', 'wave']) {
+    const previous = p.girlSprite.animation;
+    t.advance(600); assert.equal(p.girlSprite.action, action); assert.equal(previous.cancelled, true);
+  }
+  p.combo = 0; p.paint(); assert.equal(p.girlExpressionTimer, 0);
+  p.previewCombo(); assert.equal(p.girlSprite.action, 'wave'); assert.equal(p.combo, 0);
+  t.advance(600); assert.equal(p.girlSprite.action, 'shy'); assert.equal(p.combo, 0);
+  const animation = p.girlSprite.animation;
+  t.updateConfig({ combo: false }); assert.equal(p.box.style.opacity, '0'); assert.equal(animation.cancelled, true);
+  p.componentWillUnmount(); assert.equal(p.girlExpressionTimer, 0); assert.equal(p.girlSprite.animation, null);
+});
+
+test('whale girl uses discrete transparent frames, reduced motion stays still, and blur stops both layers', () => {
+  const t = setup({ theme: 'whaleGirl' });
+  t.window.matchMedia = () => ({ matches: true });
+  const p = new t.WantToType({}); p.componentDidMount();
+  p.whaleGirl.hit(.5, null); p.combo = 10; p.paint();
+  assert.equal(p.whaleGirl.sprite.action, 'idle'); assert.equal(p.whaleGirl.raf, 0);
+  assert.equal(p.girlSprite.animation, null); assert.equal(p.girlBarAnim, null);
+  p.onSpeedPause(); assert.equal(p.whaleGirl.track.style.opacity, '0'); assert.equal(p.box.style.opacity, '0');
+  p.componentWillUnmount();
+  const sprite = new t.WhaleGirlSprite(t.document.body, false); sprite.show('run');
+  assert.equal(sprite.animation.options.easing, 'linear');
+  assert.equal(sprite.animation.keyframes.length, 25);
+  assert.ok(sprite.animation.keyframes.slice(0, 24).every(frame => frame.easing === 'steps(1,end)'));
+  assert.ok(Object.values(t.WHALE_GIRL_ART).every(uri => uri.startsWith('data:image/webp;base64,')));
+  sprite.destroy();
+});
+
 test('physical keys use typing companion positions and ignore navigation', () => {
   const { physicalKeyX: x } = setup();
   assert.equal(x('Space'), .5); assert.equal(x('Backspace'), .97);
@@ -102,7 +172,7 @@ test('reversal turns, arrival jumps, reduced motion idles', () => {
   assert.equal(chase.pose(r, r.born + .01, 0, true).row, 2);
 });
 test('bottom key events are separate from typing input and combo counts', () => {
-  const t = setup(), p = new t.WantToType({}); let hits = 0;
+  const t = setup({ theme: 'buddies' }), p = new t.WantToType({}); let hits = 0;
   p.pets = { hit() { hits++; } };
   const editor = { tagName: 'TEXTAREA' };
   p.onKeyDown({ target: editor, code: 'KeyA', isComposing: true });
@@ -115,7 +185,7 @@ test('bottom key events are separate from typing input and combo counts', () => 
   p.onKeyDown({ target: editor, code: 'KeyA' }); assert.equal(hits, 1);
 });
 test('bottom canvas respects main pane, stops at idle, hides and cleans up', () => {
-  const t = setup(), root = t.document.createElement('div'), pets = new t.TypingPets(root, false);
+  const t = setup({ theme: 'buddies' }), root = t.document.createElement('div'), pets = new t.TypingPets(root, false);
   pets.frames = Array.from({ length: 3 }, () => Array.from({ length: 24 }, () => ({ tile: {}, left: 0, top: 0, right: 256, bottom: 256, baseline: 240 })));
   pets.hit(.8, { closest: () => ({ isConnected: true, getBoundingClientRect: () => ({ left: 240, right: 1200, bottom: 800 }) }) });
   assert.equal(pets.canvas.style.left, '240px'); assert.equal(pets.canvas.style.bottom, '0px');
@@ -162,7 +232,7 @@ test('bounds reject transparent cells and adjacent-cell debris', () => {
 test('combo style defaults preserve existing settings and invalid presets fall back', () => {
   for (const saved of [undefined, { combo: false }, { comboPreset: 'missing' }]) {
     const t = setup(saved);
-    assert.equal(t.getConfig().comboPreset, saved ? 'classic' : 'cute');
+    assert.equal(t.getConfig().comboPreset, saved ? 'classic' : 'whaleGirl');
     if (saved && saved.combo === false) assert.equal(t.getConfig().combo, false);
   }
   const t = setup({ comboPreset: 'heat', fullscreenEnabled: false, bottomPreset: 'matrix' });
@@ -315,12 +385,12 @@ test('bubble typing preset persists, emits at the caret and stays bounded', () =
 });
 
 
-test('new users start with the journal theme and named themes apply atomically', () => {
+test('new users start with the big fish theme and named themes apply atomically', () => {
   const t = setup();
-  assert.equal(t.getConfig().theme, 'buddies');
-  assert.equal(t.getConfig().comboPreset, 'cute');
+  assert.equal(t.getConfig().theme, 'whaleGirl');
+  assert.equal(t.getConfig().comboPreset, 'whaleGirl');
   assert.equal(t.getConfig().typingEnabled, true);
-  assert.equal(t.getConfig().typingPreset, 'cookies');
+  assert.equal(t.getConfig().typingPreset, 'hearts');
   assert.equal(t.getConfig().fullscreenEnabled, true);
   t.updateConfig({ theme: 'whale' });
   const c = t.getConfig();
@@ -392,9 +462,9 @@ test('settings and popover only expose themes, switches, preview and language', 
     assert.ok(all.some(n => n.props.className === 'wtt-segments'));
     assert.ok(all.some(n => n.props.className === 'wtt-preview'));
     const cards = all.filter(n => n.type === 'button' && (n.props.className || '').startsWith('wtt-theme wtt-theme-'));
-    assert.equal(cards.length, 4); assert.equal(cards[0].props['aria-pressed'], true);
+    assert.equal(cards.length, 5); assert.equal(cards[4].props['aria-pressed'], true);
     cards[1].props.onClick(); assert.equal(t.getConfig().theme, 'whale');
-    t.updateConfig({ theme: 'buddies' });
+    t.updateConfig({ theme: 'whaleGirl' });
   }
 });
 
@@ -406,24 +476,21 @@ function typeSpeedKeys(t, p, count, interval = 150) {
   }
 }
 
-test('fullscreen requires sustained typing speed and remains visible until speed falls', () => {
+test('fullscreen flashes briefly once per sustained fast typing period', () => {
   const t = setup({ fullscreenEnabled: true, bottomEnabled: false, typingEnabled: false, combo: false });
   const p = new t.WantToType({}); p.componentDidMount();
-  typeSpeedKeys(t, p, 10);
-  assert.equal(p.fullscreenActive, false); // Fast, but not held for one second yet.
-  typeSpeedKeys(t, p, 1);
-  assert.equal(p.fullscreenActive, true); assert.equal(p.vignette.style.opacity, '1');
-  const shadow = p.vignette.style.boxShadow;
+  typeSpeedKeys(t, p, 10); assert.equal(p.fullscreenActive, false);
+  typeSpeedKeys(t, p, 1); assert.equal(p.fullscreenActive, true);
+  const animation = p.fullscreenAnim;
+  assert.equal(animation.options.duration, 900); assert.equal(animation.keyframes.at(-1).opacity, 0);
   typeSpeedKeys(t, p, 30);
-  assert.equal(p.fullscreenActive, true); assert.equal(p.fullscreenAnim, null);
-  assert.equal(p.vignette.style.boxShadow, shadow); assert.equal(p.combo, 0);
-  typeSpeedKeys(t, p, 5, 350); // Keep typing, but too slowly.
-  assert.equal(p.fullscreenActive, false); assert.equal(p.vignette.style.opacity, '0');
-  typeSpeedKeys(t, p, 25); assert.equal(p.fullscreenActive, true);
-  t.advance(1100); // Stops without needing another key/input event.
-  assert.equal(p.fullscreenActive, false); assert.equal(p.speedTimer, 0);
-  p.combo = 75; p.paint(); assert.equal(p.fullscreenActive, false); assert.equal(p.fullscreenAnim, null);
-  p.componentWillUnmount();
+  assert.equal(p.fullscreenActive, false); assert.equal(p.fullscreenAnim, null);
+  assert.equal(animation.cancelled, true); assert.equal(p.fullscreenTriggered, true);
+  typeSpeedKeys(t, p, 5, 350); assert.equal(p.fullscreenTriggered, false);
+  t.advance(1100);
+  typeSpeedKeys(t, p, 12); assert.equal(p.fullscreenActive, true);
+  t.advance(1100); assert.equal(p.fullscreenActive, false); assert.equal(p.speedTimer, 0);
+  assert.equal(p.fullscreenTimer, 0); p.componentWillUnmount();
 });
 
 test('brief bursts and threshold-speed typing do not qualify; paste and repeat do not count', () => {
@@ -445,36 +512,36 @@ test('brief bursts and threshold-speed typing do not qualify; paste and repeat d
 
 test('speed fullscreen resets on disable, blur, hidden document and unmount', () => {
   const t = setup({ fullscreenEnabled: true, bottomEnabled: false }), p = new t.WantToType({}); p.componentDidMount();
-  typeSpeedKeys(t, p, 25); assert.equal(p.fullscreenActive, true);
+  typeSpeedKeys(t, p, 12); assert.equal(p.fullscreenActive, true);
   t.updateConfig({ theme: 'matrix', bottomEnabled: false });
-  assert.equal(p.fullscreenActive, true); assert.equal(p.vignette.style.opacity, '1');
+  assert.equal(p.fullscreenActive, true); assert.ok(p.fullscreenAnim);
   assert.ok(t.effectPalette('particles', 'fullscreen').filter(color => p.vignette.style.boxShadow.includes(color)).length >= 5);
   t.updateConfig({ fullscreenEnabled: false });
   assert.equal(p.fullscreenActive, false); assert.equal(p.speedTimer, 0); assert.equal(p.speedSamples.length, 0);
   t.updateConfig({ fullscreenEnabled: true }); assert.equal(p.fullscreenActive, false);
-  typeSpeedKeys(t, p, 25); assert.equal(p.fullscreenActive, true);
+  typeSpeedKeys(t, p, 12); assert.equal(p.fullscreenActive, true);
   t.events.get('blur')(); assert.equal(p.fullscreenActive, false); assert.equal(p.speedSince, null);
-  typeSpeedKeys(t, p, 25); assert.equal(p.fullscreenActive, true);
+  typeSpeedKeys(t, p, 12); assert.equal(p.fullscreenActive, true);
   t.document.hidden = true; t.events.get('visibilitychange')();
   assert.equal(p.fullscreenActive, false); assert.equal(p.speedTimer, 0);
-  t.document.hidden = false; p.reduced = true; typeSpeedKeys(t, p, 25); assert.equal(p.fullscreenActive, false);
-  p.reduced = false; typeSpeedKeys(t, p, 25); assert.equal(p.fullscreenActive, true);
+  t.document.hidden = false; p.reduced = true; typeSpeedKeys(t, p, 12); assert.equal(p.fullscreenActive, false);
+  p.reduced = false; typeSpeedKeys(t, p, 12); assert.equal(p.fullscreenActive, true);
   const timer = p.speedTimer; p.componentWillUnmount();
   assert.equal(p.speedTimer, 0); assert.equal(t.timers.has(timer), false); assert.equal(p.fullscreenActive, false);
 });
 
-test('fullscreen scene palettes apply immediately, rainbow stays at edges and old flashes cancel', () => {
+test('fullscreen scene palettes apply immediately, rainbow stays at edges and recoloring does not restart flashes', () => {
   const t = setup(), p = new t.WantToType({}); p.componentDidMount();
   for (const theme of ['buddies', 'whale', 'matrix', 'flow']) {
     const previous = p.fullscreenAnim;
     t.updateConfig({ theme }); assert.equal(t.getConfig().fullscreenEnabled, true);
-    if (previous) assert.equal(previous.cancelled, true);
+    if (previous) { assert.equal(p.fullscreenAnim, previous); assert.equal(previous.cancelled, false); }
     p.tierFlash(1);
     assert.equal(p.vignette.style.background, 'transparent');
     assert.equal(p.vignette.style.maskImage, 'none');
     assert.ok(p.vignette.style.boxShadow.includes('inset'));
     assert.ok(t.effectPalette('particles', 'fullscreen').some(color => p.vignette.style.boxShadow.includes(color)));
-    assert.equal(p.fullscreenAnim.options.duration, 460);
+    assert.equal(p.fullscreenAnim.options.duration, 900);
     assert.equal(p.fullscreenAnim.keyframes[1].opacity, 1);
     if (theme === 'flow' || theme === 'matrix') assert.ok(t.effectPalette('particles', 'fullscreen').filter(color => p.vignette.style.boxShadow.includes(color)).length >= 5);
   }
@@ -485,7 +552,7 @@ test('fullscreen scene palettes apply immediately, rainbow stays at edges and ol
 });
 
 test('journal theme emits warm bone cookies and keeps nodes bounded', () => {
-  const t = setup(), root = t.document.createElement('div');
+  const t = setup({ theme: 'buddies' }), root = t.document.createElement('div');
   assert.equal(t.getConfig().typingPreset, 'cookies');
   t.emitIn(root, 6, { x: 100, y: 200 }); assert.equal(root.children.length, 2);
   assert.ok(root.children.every(node => node.className === 'wtt-spark wtt-cookie'));
